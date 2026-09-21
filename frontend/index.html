@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Spend Tracker</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #222; }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.1rem; margin-top: 32px; }
+  form { display: grid; gap: 8px; margin-bottom: 16px; }
+  label { font-size: 0.85rem; color: #555; }
+  input, select, button { padding: 8px; font-size: 0.95rem; }
+  button { cursor: pointer; background: #222; color: white; border: none; border-radius: 4px; }
+  button:hover { background: #444; }
+  #status { font-size: 0.9rem; margin-top: 4px; }
+  #status.error { color: #b00020; }
+  #status.success { color: #0a7a2f; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+  tr.cat-row { cursor: pointer; }
+  tr.cat-row:hover { background: #f7f7f7; }
+  tr.cat-row .arrow { display: inline-block; width: 1em; transition: transform 0.15s; }
+  tr.cat-row.open .arrow { transform: rotate(90deg); }
+  tr.detail-row > td { padding: 0 0 8px 24px; background: #fafafa; }
+  table.expenses { margin: 0; }
+  table.expenses td, table.expenses th { font-size: 0.85rem; }
+  .insight { background: #fff4e5; border: 1px solid #ffd699; padding: 8px; border-radius: 4px; margin-top: 8px; font-size: 0.9rem; }
+  .config { font-size: 0.8rem; color: #888; margin-bottom: 24px; }
+  .config input { width: 220px; }
+</style>
+</head>
+<body>
+
+<h1>Spend Tracker</h1>
+
+<div class="config">
+  API base URL: <input id="apiBase" value="http://localhost:8000" />
+  API key (optional): <input id="apiKey" placeholder="leave blank if auth disabled" />
+</div>
+
+<h2>Add an expense</h2>
+<form id="expenseForm">
+  <label>Amount (INR)
+    <input type="number" id="amount" step="0.01" min="0.01" required />
+  </label>
+  <label>Category
+    <select id="category" required>
+      <option value="food">food</option>
+      <option value="transport">transport</option>
+      <option value="housing">housing</option>
+      <option value="entertainment">entertainment</option>
+      <option value="utilities">utilities</option>
+      <option value="health">health</option>
+      <option value="other">other</option>
+    </select>
+  </label>
+  <label>Date
+    <input type="date" id="date" required />
+  </label>
+  <label>Note (optional)
+    <input type="text" id="note" maxlength="500" />
+  </label>
+  <button type="submit">Add expense</button>
+</form>
+<div id="status"></div>
+
+<h2>Summary <button id="refreshBtn" style="float:right; font-size:0.8rem;">Refresh</button></h2>
+<label>Month
+  <input type="month" id="summaryMonth" />
+</label>
+<div id="summary">Loading…</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function apiBase() { return $('apiBase').value.replace(/\/$/, ''); }
+  function headers() {
+    const h = { 'Content-Type': 'application/json' };
+    const key = $('apiKey').value.trim();
+    if (key) h['X-API-Key'] = key;
+    return h;
+  }
+
+  // Default date fields to today / current month.
+  const today = new Date().toISOString().slice(0, 10);
+  $('date').value = today;
+  $('summaryMonth').value = today.slice(0, 7);
+
+  $('expenseForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const status = $('status');
+    status.textContent = 'Saving…';
+    status.className = '';
+
+    const payload = {
+      amount: parseFloat($('amount').value),
+      category: $('category').value,
+      date: $('date').value,
+      note: $('note').value || null,
+    };
+
+    try {
+      const resp = await fetch(`${apiBase()}/expenses`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify(payload),
+      });
+      const body = await resp.json();
+      if (!resp.ok) {
+        status.textContent = `Error: ${body.error || 'request failed'}${body.detail ? ' — ' + body.detail : ''}`;
+        status.className = 'error';
+        return;
+      }
+      status.textContent = `Added: $${body.amount.toFixed(2)} (${body.category}) on ${body.date}`;
+      status.className = 'success';
+      $('expenseForm').reset();
+      $('date').value = today;
+      loadSummary();
+    } catch (err) {
+      status.textContent = `Network error: ${err.message}`;
+      status.className = 'error';
+    }
+  });
+
+  async function loadSummary() {
+    const el = $('summary');
+    el.textContent = 'Loading…';
+    const month = $('summaryMonth').value; // "YYYY-MM"
+    try {
+      const resp = await fetch(`${apiBase()}/summary?month=${month}`, { headers: headers() });
+      const body = await resp.json();
+      if (!resp.ok) {
+        el.textContent = `Error: ${body.error || 'request failed'}`;
+        return;
+      }
+
+      let html = `<p><strong>Total spend (${body.month}):</strong> $${body.total_spend.toFixed(2)}</p>`;
+      html += `<p><strong>Previous month total:</strong> $${body.previous_month_total.toFixed(2)} `;
+      html += body.month_over_month_change_pct === null
+        ? '(no prior month data)'
+        : `(${body.month_over_month_change_pct > 0 ? '+' : ''}${body.month_over_month_change_pct}% MoM)`;
+      html += '</p>';
+
+      if (body.spend_by_category.length) {
+        html += '<table id="categoryTable"><tr><th>Category</th><th>Total</th></tr>';
+        for (const c of body.spend_by_category) {
+          const isOpen = openCategories.has(c.category);
+          html += `<tr class="cat-row${isOpen ? ' open' : ''}" data-category="${c.category}">` +
+                  `<td><span class="arrow">▶</span>${c.category}</td><td>$${c.total.toFixed(2)}</td></tr>` +
+                  `<tr class="detail-row" data-detail-for="${c.category}"${isOpen ? '' : ' hidden'}>` +
+                  `<td colspan="2">Loading…</td></tr>`;
+        }
+        html += '</table>';
+      } else {
+        html += '<p>No expenses this month.</p>';
+      }
+
+      for (const insight of body.insights) {
+        html += `<div class="insight">⚠ ${insight}</div>`;
+      }
+
+      el.innerHTML = html;
+
+      // Re-populate any categories that were expanded before the refresh.
+      for (const category of openCategories) loadCategoryExpenses(category);
+    } catch (err) {
+      el.textContent = `Network error: ${err.message}`;
+    }
+  }
+
+  // Categories currently expanded; kept across refreshes so adding an
+  // expense doesn't collapse what the user was looking at.
+  const openCategories = new Set();
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (ch) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+    ));
+  }
+
+  async function loadCategoryExpenses(category) {
+    const cell = document.querySelector(`tr[data-detail-for="${category}"] td`);
+    if (!cell) return;
+    const month = $('summaryMonth').value; // "YYYY-MM"
+    const [y, m] = month.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    const params = new URLSearchParams({
+      category,
+      start_date: `${month}-01`,
+      end_date: `${month}-${String(lastDay).padStart(2, '0')}`,
+    });
+    try {
+      const resp = await fetch(`${apiBase()}/expenses?${params}`, { headers: headers() });
+      const body = await resp.json();
+      if (!resp.ok) {
+        cell.textContent = `Error: ${body.error || body.detail || 'request failed'}`;
+        return;
+      }
+      if (!body.length) {
+        cell.textContent = 'No expenses.';
+        return;
+      }
+      body.sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+      let html = '<table class="expenses"><tr><th>Date</th><th>Note</th><th>Amount</th></tr>';
+      for (const e of body) {
+        html += `<tr><td>${e.date}</td><td>${e.note ? escapeHtml(e.note) : '—'}</td>` +
+                `<td>$${e.amount.toFixed(2)}</td></tr>`;
+      }
+      html += '</table>';
+      cell.innerHTML = html;
+    } catch (err) {
+      cell.textContent = `Network error: ${err.message}`;
+    }
+  }
+
+  // Event delegation: the summary HTML is rebuilt on every refresh.
+  $('summary').addEventListener('click', (e) => {
+    const row = e.target.closest('tr.cat-row');
+    if (!row) return;
+    const category = row.dataset.category;
+    const detail = document.querySelector(`tr[data-detail-for="${category}"]`);
+    if (openCategories.has(category)) {
+      openCategories.delete(category);
+      row.classList.remove('open');
+      detail.hidden = true;
+    } else {
+      openCategories.add(category);
+      row.classList.add('open');
+      detail.hidden = false;
+      loadCategoryExpenses(category);
+    }
+  });
+
+  $('refreshBtn').addEventListener('click', (e) => { e.preventDefault(); loadSummary(); });
+  $('summaryMonth').addEventListener('change', loadSummary);
+
+  loadSummary();
+</script>
+
+</body>
+</html>

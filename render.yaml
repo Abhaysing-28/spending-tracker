@@ -1,0 +1,19 @@
+# Render Blueprint — see https://render.com/docs/blueprint-spec
+# To deploy: push this repo to GitHub, then in Render click
+# "New +" -> "Blueprint" and point it at the repo. Render reads this file
+# and provisions the service automatically.
+services:
+  - type: web
+    name: spend-tracker-api
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: SPEND_TRACKER_API_KEY
+        sync: false  # set manually in Render dashboard if you want auth enabled
+      - key: SPEND_TRACKER_DB_URL
+        value: sqlite:////opt/render/project/src/spend_tracker.db
+    # NOTE: Render's free tier disk is ephemeral — this SQLite file resets
+    # on every redeploy/restart. Fine for a demo; see README for what a
+    # persistent setup would look like.
