@@ -26,7 +26,9 @@
   table.expenses td, table.expenses th { font-size: 0.85rem; }
   .insight { background: #fff4e5; border: 1px solid #ffd699; padding: 8px; border-radius: 4px; margin-top: 8px; font-size: 0.9rem; }
   .config { font-size: 0.8rem; color: #888; margin-bottom: 24px; }
-  .config input { width: 220px; }
+  .config-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .config-row label { width: 130px; font-size: 0.8rem; color: #888; }
+  .config input { width: 260px; padding: 4px 6px; font-size: 0.8rem; }
 </style>
 </head>
 <body>
@@ -34,8 +36,14 @@
 <h1>Spend Tracker</h1>
 
 <div class="config">
-  API base URL: <input id="apiBase" value="http://localhost:8000" />
-  API key (optional): <input id="apiKey" placeholder="leave blank if auth disabled" />
+  <div class="config-row">
+    <label for="apiBase">API base URL:</label>
+    <input id="apiBase" value="http://localhost:8000" />
+  </div>
+  <div class="config-row">
+    <label for="apiKey">API key (optional):</label>
+    <input id="apiKey" placeholder="leave blank if auth disabled" />
+  </div>
 </div>
 
 <h2>Add an expense</h2>
