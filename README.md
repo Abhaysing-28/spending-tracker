@@ -27,7 +27,7 @@ pytest tests/ -v
 ```
 
 **Use the frontend:**
-Just open `frontend/index.html` directly in a browser (no build step, no server needed for the frontend itself). It defaults to calling `http://localhost:8000` — change the "API base URL" field at the top if your API is running elsewhere (e.g. the deployed Render URL).
+Open **http://localhost:8000/** — the API serves the minimal UI (`frontend/index.html`) from the same origin, so there's nothing to configure. (Click a category in the summary to expand its individual expenses.) The file also still works if opened directly in a browser; it then defaults to `http://localhost:8000`, and you can change the "API base URL" field to point elsewhere. `GET /health` returns a JSON liveness check.
 
 **Enable API key auth (optional):**
 ```bash
@@ -99,7 +99,7 @@ Deployed via [Render](https://render.com)'s free tier — chosen because it requ
 1. Push this repo to GitHub.
 2. In Render: "New +" → "Blueprint" → connect the repo. Render reads `render.yaml` and provisions the service.
 3. (Optional) Set `SPEND_TRACKER_API_KEY` in the Render dashboard's environment variables to enable auth.
-4. Once live, update the "API base URL" field in `frontend/index.html` (or just type the Render URL into that field in the browser) to point the UI at the deployed API.
+4. Once live, open the Render URL — the root path serves the UI, which automatically calls the same origin. API docs are at `/docs`.
 
 **Known limitation:** Render's free tier uses ephemeral disk, so the SQLite file resets on every redeploy or restart. This is an accepted tradeoff for a zero-cost demo deployment, not an oversight — see `ARCHITECTURE.md` for the alternatives considered.
 

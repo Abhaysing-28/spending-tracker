@@ -7,17 +7,19 @@ Routes:
   GET  /summary   — total spend, spend by category, month-over-month change,
                      and insights (>20% category increase flags)
 
-All routes except GET / are protected by an optional API key
+GET / serves the frontend UI and GET /health is a liveness check. All
+/expenses and /summary routes are protected by an optional API key
 (see app/auth.py) — disabled by default for local dev, enabled by setting
 SPEND_TRACKER_API_KEY.
 """
 import datetime as dt
+from pathlib import Path
 from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from app import crud, models, schemas, summary
@@ -55,8 +57,18 @@ async def validation_exception_handler(request, exc: RequestValidationError):
     )
 
 
-@app.get("/")
+FRONTEND_INDEX = Path(__file__).resolve().parent.parent / "frontend" / "index.html"
+
+
+@app.get("/", include_in_schema=False)
 def root():
+    # Serve the minimal UI from the same origin as the API so a single
+    # public URL gives the full end-to-end experience.
+    return FileResponse(FRONTEND_INDEX)
+
+
+@app.get("/health")
+def health():
     return {"status": "ok", "service": "spend-tracker-api"}
 
 

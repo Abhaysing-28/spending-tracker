@@ -81,6 +81,10 @@
     return h;
   }
 
+  // When served by the API itself (http/https), call the same origin; when
+  // opened as a local file, keep the localhost default above.
+  if (location.protocol.startsWith('http')) $('apiBase').value = location.origin;
+
   // Default date fields to today / current month.
   const today = new Date().toISOString().slice(0, 10);
   $('date').value = today;
