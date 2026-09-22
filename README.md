@@ -2,8 +2,6 @@
 
 A small REST API + minimal UI for logging expenses and viewing a spend summary.
 
-See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full record of options considered at each decision point and why we picked what we picked. This README covers how to run it and a condensed version of the key decisions.
-
 ---
 
 ## How to run it
@@ -115,7 +113,3 @@ Deployed via [Render](https://render.com)'s free tier — chosen because it requ
 - **Frontend polish** — it's intentionally bare-bones per the task's scope ("design/styling will not be evaluated"); a real version would use a framework and proper state management instead of hand-rolled `fetch` calls.
 
 ---
-
-## Note on AI tool usage
-
-I used Claude to help scaffold the FastAPI/SQLAlchemy structure, generate the initial test cases, and draft this README. I reviewed and adjusted the generated validation logic (particularly the divide-by-zero handling in the month-over-month calculation and the decision to store money as integer cents rather than floats, which the first draft didn't handle), and rewrote several test cases to cover edge cases the initial pass missed, like categories with no prior-month data for the insight check.
